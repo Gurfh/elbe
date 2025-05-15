@@ -132,6 +132,11 @@ class fstabentry(hdpart):
                     self.fs_path_commands.append(command.text('.'))
 
         self.id = str(fsid)
+        # Attributes for storing root directory properties (for bug fix)
+        self.root_mode = None
+        self.root_uid = None
+        self.root_gid = None
+
 
     def get_str(self):
         return (f'{self.source} {self.mountpoint} {self.fstype} {self.options} '

@@ -315,6 +315,22 @@ def create_label(disk, part, ppart, fslabel, target, grub):
                 os.path.join(target, 'filesystems', entry.id) + '/.',
                 str(mount_path) + '/',
             ])
+            # Apply captured attributes to the root of the mounted filesystem
+            if entry.root_uid is not None and entry.root_gid is not None:
+                try:
+                    os.chown(str(mount_path), entry.root_uid, entry.root_gid)
+                except OSError as e:
+                    logging.error(
+                        f"Failed to chown {mount_path} to UID {entry.root_uid}, GID {entry.root_gid}: {e}"
+                    )
+            
+            if entry.root_mode is not None:
+                try:
+                    os.chmod(str(mount_path), entry.root_mode)
+                except OSError as e:
+                    logging.error(
+                        f"Failed to chmod {mount_path} to mode {oct(entry.root_mode)}: {e}"
+                    )
 
     return ppart
 
@@ -510,12 +526,30 @@ def do_hdimg(xml, target, rfs, grub_version, grub_fw_type=None):
     # now move all mountpoints into own directories
     # begin from deepest mountpoints
     for lic in reversed(fslist):
-        do(['mkdir', '-p', os.path.join(fspath, lic.id)])
-        do(['mkdir', '-p', rfs.fname(lic.mountpoint)])
-        if rfs.listdir(lic.mountpoint):
+        source_dir = rfs.fname(lic.mountpoint) 
+
+        # Capture attributes of the source mountpoint directory
+        if os.path.exists(source_dir):
+            stat_info = os.stat(source_dir)
+            lic.root_mode = stat_info.st_mode
+            lic.root_uid = stat_info.st_uid
+            lic.root_gid = stat_info.st_gid
+        else:
+            logging.warning(
+                f"Source directory {source_dir} for mountpoint {lic.mountpoint} "
+                "not found before moving contents. Root attributes may not be set correctly."
+            )
+
+        fspath_id_dir = os.path.join(fspath, lic.id)
+        do(['mkdir', '-p', fspath_id_dir])
+
+        rfs_mountpoint_dir = rfs.fname(lic.mountpoint)
+        do(['mkdir', '-p', rfs_mountpoint_dir])
+
+        if rfs.listdir(rfs_mountpoint_dir):
             do(
-               f'mv "{rfs.fname(lic.mountpoint)}"/* '
-               f'"{os.path.join(fspath, lic.id)}"',
+               f'mv "{rfs_mountpoint_dir}"/* '
+               f'"{fspath_id_dir}"',
                check=False)
 
     try:
