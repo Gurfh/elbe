@@ -137,7 +137,6 @@ class fstabentry(hdpart):
         self.root_uid = None
         self.root_gid = None
 
-
     def get_str(self):
         return (f'{self.source} {self.mountpoint} {self.fstype} {self.options} '
                 f'0 {self.passno}\n')
