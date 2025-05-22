@@ -300,16 +300,21 @@ def create_label(disk, part, ppart, fslabel, target, grub):
     grub.add_fs_entry(entry)
 
     with entry.losetup() as loopdev:
-        do(
-            f'mkfs.{entry.fstype} {entry.mkfsopt} {entry.get_label_opt()} '
-            f'{loopdev}')
+        cmd_list = ['mkfs.' + entry.fstype]
+        if entry.mkfsopt:
+            cmd_list.extend(shlex.split(entry.mkfsopt))
+        label_opt = entry.get_label_opt()
+        if label_opt:
+            cmd_list.extend(shlex.split(label_opt))
+        cmd_list.append(loopdev)
+        do(cmd_list)
 
-        _execute_fs_commands(entry.fs_device_commands, dict(device=loopdev))
+        _execute_fs_commands(entry.fs_device_commands, {'device': loopdev})
 
         mount_path = Path(target, 'imagemnt')
 
         with mount(loopdev, mount_path):
-            _execute_fs_commands(entry.fs_path_commands, dict(path=mount_path))
+            _execute_fs_commands(entry.fs_path_commands, {'path': mount_path})
             do([
                 'cp', '-a',
                 os.path.join(target, 'filesystems', entry.id) + '/.',
@@ -526,7 +531,7 @@ def do_hdimg(xml, target, rfs, grub_version, grub_fw_type=None):
     # now move all mountpoints into own directories
     # begin from deepest mountpoints
     for lic in reversed(fslist):
-        source_dir = rfs.fname(lic.mountpoint) 
+        source_dir = rfs.fname(lic.mountpoint)
 
         # Capture attributes of the source mountpoint directory
         if os.path.exists(source_dir):
@@ -536,8 +541,8 @@ def do_hdimg(xml, target, rfs, grub_version, grub_fw_type=None):
             lic.root_gid = stat_info.st_gid
         else:
             logging.warning(
-                f"Source directory {source_dir} for mountpoint {lic.mountpoint} "
-                "not found before moving contents. Root attributes may not be set correctly."
+                f'Source directory {source_dir} for mountpoint {lic.mountpoint} '
+                'not found before moving contents. Root attributes may not be set correctly.'
             )
 
         fspath_id_dir = os.path.join(fspath, lic.id)
